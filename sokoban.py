@@ -1,5 +1,4 @@
 import time
-import os
 
 class SokobanState(object):
     MOVE_LEFT   = 1
@@ -24,6 +23,7 @@ class SokobanState(object):
         self.obstacles = obstacles
         self.size = size
         self.depth = 0
+        self.hname = h
         if h == 'manhattan':
             self.h = self.manhattan_dist
         elif h == 'euclidean':
@@ -97,18 +97,14 @@ class SokobanState(object):
             obj_r = (box[0]+1, box[1]) in self.obstacles
             obj_u = (box[0], box[1]-1) in self.obstacles
             obj_b = (box[0], box[1]+1) in self.obstacles
-            obj_ul = (box[0]-1, box[1]-1) in self.obstacles
-            obj_ur = (box[0]+1, box[1]-1) in self.obstacles
-            obj_bl = (box[0]-1, box[1]+1) in self.obstacles
-            obj_br = (box[0]+1, box[1]+1) in self.obstacles
 
-            if obj_l and obj_ul and obj_u:
+            if obj_l and obj_u:
                 return True
-            if obj_l and obj_bl and obj_b:
+            if obj_l and obj_b:
                 return True
-            if obj_r and obj_br and obj_b:
+            if obj_r and obj_b:
                 return True
-            if obj_r and obj_ur and obj_u:
+            if obj_r and obj_u:
                 return True
         
         return False
@@ -187,7 +183,8 @@ class SokobanState(object):
             storage = self.storage,
             obstacles = self.obstacles,
             size = self.size,
-            depth = self.depth + 1
+            depth = self.depth + 1,
+            h = self.hname
         )
 
     def manhattan_dist(self):
@@ -206,6 +203,7 @@ class SokobanState(object):
         """ Calculate Euclidean distance """
         dist = 0.0
         for box in self.box:
+            # distance between box and nearest storage
             min_dist = 1 << 32
             for storage in self.storage:
                 d = ((box[0]-storage[0])**2 + (box[1]-storage[1])**2)**0.5
@@ -251,7 +249,7 @@ class SokobanEmulator(object):
         for step, move in enumerate(moves):
             time.sleep(interval)
             if clear:
-                os.system("clear")
+                print("\x1b[2J\x1b[H", end="")
             print("STEP:{}  /  MOVE:{}".format(step+1, move))
             s = s.go(move)
             print(s)

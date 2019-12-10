@@ -35,7 +35,7 @@ if __name__ == '__main__':
         exit(1)
     
     with open(sys.argv[1], "r") as f:
-        s = SokobanState(h='manhattan')
+        s = SokobanState(h='euclidean')
         s.load(f)
 
     moves = solve(s)
