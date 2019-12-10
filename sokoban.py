@@ -212,6 +212,9 @@ class SokobanState(object):
             dist += min_dist
         return dist
 
+    def g(self):
+        return len(self.moves)
+
     def __str__(self):
         output = ''
         for y in range(self.size[1]):
@@ -236,7 +239,7 @@ class SokobanState(object):
         ))
 
     def __lt__(self, other):
-        return self.h() < other.h()
+        return self.h() + self.g() < other.h() + other.g()
 
 class SokobanEmulator(object):
     def __init__(self, initial_state):
