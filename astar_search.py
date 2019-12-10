@@ -1,13 +1,15 @@
 #!/usr/bin/env python
 import sys
+import heapq
 from sokoban import *
 
 def solve(initial_state):
-    stack = [initial_state]
+    queue = [initial_state]
+    heapq.heapify(queue)
     history = []
     
-    while stack:
-        s = stack.pop()
+    while queue:
+        s = heapq.heappop(queue)
         hashval = hash(s)
 
         if hashval in history:
@@ -19,7 +21,7 @@ def solve(initial_state):
                 continue
             else:
                 for move in s.get_moves():
-                    stack.append(s.go(move))
+                    heapq.heappush(queue, s.go(move))
         
         history.append(hashval)
     else:
@@ -33,7 +35,7 @@ if __name__ == '__main__':
         exit(1)
     
     with open(sys.argv[1], "r") as f:
-        s = SokobanState()
+        s = SokobanState(h='manhattan')
         s.load(f)
 
     moves = solve(s)

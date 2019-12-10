@@ -7,7 +7,15 @@ class SokobanState(object):
     MOVE_UP     = 3
     MOVE_BOTTOM = 4
     
-    def __init__(self, moves=[], robot=None, box=[], storage=[], obstacles=[], size=None):
+    def __init__(self,
+                 moves=[],
+                 robot=None,
+                 box=[],
+                 storage=[],
+                 obstacles=[],
+                 size=None,
+                 depth=0,
+                 h='manhattan'):
         """ Initialize and reset this instance """
         self.moves = moves
         self.robot = robot
@@ -15,6 +23,15 @@ class SokobanState(object):
         self.storage = storage
         self.obstacles = obstacles
         self.size = size
+        self.depth = 0
+        if h == 'manhattan':
+            self.h = self.manhattan_dist
+        elif h == 'euclidean':
+            self.h = self.euclidean_dist
+        else:
+            raise SokobanException(
+                'Undefined heuristic function `{}`'.format(h)
+            )
     
     def load(self, fstream):
         x, y = 0, 0
@@ -169,8 +186,33 @@ class SokobanState(object):
             box = next_box,
             storage = self.storage,
             obstacles = self.obstacles,
-            size = self.size
+            size = self.size,
+            depth = self.depth + 1
         )
+
+    def manhattan_dist(self):
+        """ Calculate Manhattan distance """
+        dist = 0
+        for box in self.box:
+            min_dist = 1 << 32
+            for storage in self.storage:
+                d = abs(box[0] - storage[0]) + abs(box[1] - storage[1])
+                if min_dist > d:
+                    min_dist = d
+            dist += min_dist
+        return dist
+
+    def euclidean_dist(self):
+        """ Calculate Euclidean distance """
+        dist = 0.0
+        for box in self.box:
+            min_dist = 1 << 32
+            for storage in self.storage:
+                d = ((box[0]-storage[0])**2 + (box[1]-storage[1])**2)**0.5
+                if min_dist > d:
+                    min_dist = d
+            dist += min_dist
+        return dist
 
     def __str__(self):
         output = ''
@@ -194,6 +236,9 @@ class SokobanState(object):
             self.robot,
             tuple(self.box)
         ))
+
+    def __lt__(self, other):
+        return self.h() < other.h()
 
 class SokobanEmulator(object):
     def __init__(self, initial_state):
