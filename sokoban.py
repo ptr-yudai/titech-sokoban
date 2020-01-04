@@ -13,6 +13,8 @@ class SokobanState(object):
                  storage=[],
                  obstacles=[],
                  size=None,
+                 dead=None,
+                 frozen=None,
                  depth=0,
                  h='manhattan'):
         """ Initialize and reset this instance """
@@ -24,6 +26,10 @@ class SokobanState(object):
         self.size = size
         self.depth = 0
         self.hname = h
+        if dead is not None:
+            self.dead = dead
+        if frozen is not None:
+            self.frozen = frozen
         if h == 'manhattan':
             self.h = self.manhattan_dist
         elif h == 'euclidean':
@@ -76,6 +82,8 @@ class SokobanState(object):
             raise SokobanException("Too many boxes for the storage")
 
         self.size = (width, y)
+        self.dead = self.find_dead_square()
+        self.frozen = {box: False for box in self.box}
 
     def is_goal(self):
         """ Check if this state is the goal state """
@@ -84,29 +92,94 @@ class SokobanState(object):
                 return False
         return True
 
+    def find_dead_square(self):
+        """ Search for dead square
+        """
+        dead_square = set()
+        for y in range(self.size[1]):
+            for x in range(self.size[0]):
+                dead_square.add((x, y))
+        dead_square -= self.find_safe_space()
+        dead_square -= set(self.obstacles)
+        return dead_square
+
+    def find_safe_space(self):
+        """ Search for safe space
+        """
+        safe = set()
+        for storage in self.storage:
+            safe = safe.union(self._find_safe_space(storage))
+        return safe
+
+    def _find_safe_space(self, initial_box):
+        stack = [initial_box]
+        safe = set()
+        visited = []
+        
+        while len(stack) > 0:
+            box = stack.pop()
+            if box in visited:
+                continue
+
+            visited.append(box)
+            safe.add(box)
+            for d in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                next_pos = (box[0]+d[0], box[1]+d[1])
+                step_pos = (next_pos[0]+d[0], next_pos[1]+d[1])
+                if next_pos in self.obstacles:
+                    continue
+                if step_pos not in self.obstacles:
+                    stack.append(next_pos)
+
+        return safe
+    
     def is_deadlock(self):
         """ Check if a box is in deadlock
-        A box is in deadlock if one of the following states hold:
-         ##  #$  $#  ##
-         #$  ##  ##  $#
         """
+        # Detect dead square deadlocks
         for box in self.box:
-            if box in self.storage: continue # ignore
-            
-            obj_l = (box[0]-1, box[1]) in self.obstacles
-            obj_r = (box[0]+1, box[1]) in self.obstacles
-            obj_u = (box[0], box[1]-1) in self.obstacles
-            obj_b = (box[0], box[1]+1) in self.obstacles
-
-            if obj_l and obj_u:
-                return True
-            if obj_l and obj_b:
-                return True
-            if obj_r and obj_b:
-                return True
-            if obj_r and obj_u:
+            if box in self.dead:
                 return True
         
+        return False
+
+    def check_frozen(self, box, frozen):
+        """ Check for frozen deadlocks """
+        horizontal_lock = vertical_lock = False
+        if box not in frozen:
+            return False
+
+        # 1. Check for obstacles
+        if (box[0] - 1, box[1]) in self.obstacles: horizontal_lock = True
+        elif (box[0] + 1, box[1]) in self.obstacles: horizontal_lock = True
+        if (box[0], box[1] - 1) in self.obstacles: vertical_lock = True
+        elif (box[0], box[1] + 1) in self.obstacles: vertical_lock = True
+
+        # 2. Check for deadlocks
+        if (box[0] - 1, box[1]) in self.dead and (box[0] + 1, box[1]) in self.dead: horizontal_lock = True
+        if (box[0], box[1] - 1) in self.dead and (box[0], box[1] + 1) in self.dead: vertical_lock = True
+
+        # 3. Check for frozen blocks
+        if (box[0] - 1, box[1]) in frozen:
+            if frozen[(box[0] - 1, box[1])]:
+                horizontal_lock = True
+        elif (box[0] + 1, box[1]) in frozen:
+            if frozen[(box[0] + 1, box[1])]:
+                horizontal_lock = True
+        if (box[0], box[1] - 1) in frozen:
+            if frozen[(box[0], box[1] - 1)]:
+                vertical_lock = True
+        elif (box[0], box[1] + 1) in frozen:
+            if frozen[(box[0], box[1] + 1)]:
+                vertical_lock = True
+
+        # Detect lock
+        if horizontal_lock and vertical_lock:
+            frozen[box] = True
+            if box not in self.storage:
+                return True
+        else:
+            frozen[box] = False
         return False
 
     def get_moves(self):
@@ -141,41 +214,45 @@ class SokobanState(object):
         if not obj[1][0]: moves.append((self.MOVE_RIGHT, obj[1][1]))
         if not obj[2][0]: moves.append((self.MOVE_UP, obj[2][1]))
         if not obj[3][0]: moves.append((self.MOVE_BOTTOM, obj[3][1]))
-
         return moves
 
     def go(self, m):
         """ Move to next state (No assertion made!) """
         direction, move_box = m
         next_box = list(self.box)
+        next_frozen = self.frozen.copy()
 
         if direction == self.MOVE_LEFT:
             # Move to left
             next_robot = (self.robot[0] - 1, self.robot[1])
-            if move_box:
-                next_box.remove(next_robot)
-                next_box.append((next_robot[0] - 1, next_robot[1]))
+            moved_box = (next_robot[0] - 1, next_robot[1])
         elif direction == self.MOVE_RIGHT:
             # Move to right
             next_robot = (self.robot[0] + 1, self.robot[1])
-            if move_box:
-                next_box.remove(next_robot)
-                next_box.append((next_robot[0] + 1, next_robot[1]))
+            moved_box = (next_robot[0] + 1, next_robot[1])
         elif direction == self.MOVE_UP:
             # Move to up
             next_robot = (self.robot[0], self.robot[1] - 1)
-            if move_box:
-                next_box.remove(next_robot)
-                next_box.append((next_robot[0], next_robot[1] - 1))
+            moved_box = (next_robot[0], next_robot[1] - 1)
         elif direction == self.MOVE_BOTTOM:
             # Move to bottom
             next_robot = (self.robot[0], self.robot[1] + 1)
-            if move_box:
-                next_box.remove(next_robot)
-                next_box.append((next_robot[0], next_robot[1] + 1))
+            moved_box = (next_robot[0], next_robot[1] + 1)
         else:
             raise SokobanException("No such move")
+        
+        if move_box:
+            next_box.remove(next_robot)
+            next_box.append(moved_box)
 
+            # Update frozen state
+            next_frozen[moved_box] = next_frozen[next_robot]
+            del next_frozen[next_robot]
+
+            # Check for freeze deadlock
+            if self.check_frozen(moved_box, next_frozen):
+                return None
+        
         return SokobanState(
             moves = self.moves + [(direction, move_box)],
             robot = next_robot,
@@ -183,6 +260,8 @@ class SokobanState(object):
             storage = self.storage,
             obstacles = self.obstacles,
             size = self.size,
+            dead = self.dead,
+            frozen = next_frozen,
             depth = self.depth + 1,
             h = self.hname
         )

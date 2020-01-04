@@ -9,19 +9,20 @@ def solve(initial_state):
     while stack:
         s = stack.pop()
         hashval = hash(s)
-
         if hashval in history:
             continue # visited
-        elif s.is_goal():
+        
+        history.append(hashval)
+        if s.is_goal():
             break # goal
         else:
             if s.is_deadlock():
                 continue
             else:
                 for move in s.get_moves():
-                    stack.append(s.go(move))
-        
-        history.append(hashval)
+                    state = s.go(move)
+                    if state:
+                        stack.append(state)
     else:
         return None
     
@@ -37,8 +38,11 @@ if __name__ == '__main__':
         s.load(f)
 
     moves = solve(s)
+    print(len(moves))
+    #"""
     if moves is None:
         print("Solution not found")
     else:
         e = SokobanEmulator(s)
         e.emulate(moves)
+    #"""

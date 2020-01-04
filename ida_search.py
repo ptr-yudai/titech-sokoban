@@ -33,13 +33,15 @@ def search(path, g, bound, history):
     minimum = 1 << 32
 
     for move in node.get_moves():
-        path.append(node.go(move))
-        t = search(list(path), g + 1, bound, history)
-        if isinstance(t, SokobanState):
-            return t
-        if t < minimum:
-            minimum = t
-        path.pop()
+        state = node.go(move)
+        if state:
+            path.append(state)
+            t = search(list(path), g + 1, bound, history)
+            if isinstance(t, SokobanState):
+                return t
+            if t < minimum:
+                minimum = t
+            path.pop()
 
     return minimum
 
@@ -53,8 +55,11 @@ if __name__ == '__main__':
         s.load(f)
 
     moves = solve(s)
+    print(len(moves))
+    #"""
     if moves is None:
         print("Solution not found")
     else:
         e = SokobanEmulator(s)
         e.emulate(moves)
+    #"""

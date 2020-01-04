@@ -11,19 +11,20 @@ def solve(initial_state):
     while queue:
         s = heapq.heappop(queue)
         hashval = hash(s)
-
         if hashval in history:
             continue # visited
-        elif s.is_goal():
+        
+        history.append(hashval)
+        if s.is_goal():
             break # goal
         else:
             if s.is_deadlock():
                 continue
             else:
                 for move in s.get_moves():
-                    heapq.heappush(queue, s.go(move))
-        
-        history.append(hashval)
+                    state = s.go(move)
+                    if state:
+                        heapq.heappush(queue, state)
     else:
         return None
     
@@ -39,8 +40,11 @@ if __name__ == '__main__':
         s.load(f)
 
     moves = solve(s)
+    print(len(moves))
+    #"""
     if moves is None:
         print("Solution not found")
     else:
         e = SokobanEmulator(s)
         e.emulate(moves)
+    #"""
